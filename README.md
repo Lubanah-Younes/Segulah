@@ -1,10 +1,11 @@
-# 🧬 SEGULAH AI - AI-Powered Drug Discovery Platform
+🧬 SEGULAH AI - AI-Powered Drug Discovery Platform
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org/)
 [![TensorFlow](https://img.shields.io/badge/TensorFlow-2.21-orange)](https://tensorflow.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.55-red)](https://streamlit.io/)
 [![RDKit](https://img.shields.io/badge/RDKit-2025.9-green)](https://rdkit.org/)
-[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+[![R](https://img.shields.io/badge/R-4.5.3-blue)](https://www.r-project.org/)
+[![License](https://img.shields.io/badge/License-MIT-CR-yellow)](LICENSE)
 
 ## 🔬 Overview
 
@@ -62,6 +63,19 @@ The system uses a trained Neural Network (R² = 0.620) to evaluate molecular pro
 | **Cloud Storage** | Google BigQuery |
 | **APIs** | ChEMBL, UniProt, PubChem, PDB |
 
+### 📊 R Statistical Analysis
+
+The project includes R scripts for:
+- **DESeq2** - Differential gene expression (NGS) analysis
+- **Proteomics** - MSstats alternative for protein quantification
+- **Statistical testing** - T-test, ANOVA for compound potency comparison
+
+| R Script | Purpose | Output |
+|----------|---------|--------|
+| `r_analysis.R` | T-test between potent and weak compounds | `r_results.txt` |
+| `deseq2_analysis.R` | RNA-Seq differential expression | `deseq2_results.csv`, `deseq2_plot.png` |
+| `proteomics_simple.R` | Proteomics data analysis | `proteomics_results.csv`, `proteomics_volcano.png` |
+
 ---
 
 ## 📁 Project Structure
@@ -74,7 +88,10 @@ segulah-ai/
 │ └── assets/ # Logo and images
 ├── scripts/ # Python and R scripts
 │ ├── python/ # Data collection & ETL
-│ └── r/ # Statistical analysis
+│ └── r/ # R statistical analysis
+│ ├── r_analysis.R # T-test and statistics
+│ ├── deseq2_analysis.R # NGS differential expression
+│ └── proteomics_simple.R # Proteomics analysis
 ├── generative_ai/ # AI model training
 ├── data/ # Processed datasets
 ├── results/ # Output files and plots
@@ -106,6 +123,11 @@ text
 - ADMET score (0-100)
 - Potency classification: Super Potent → Weak
 
+### 5. Statistical Analysis (R)
+- **T-test**: Comparison between potent (IC50 < 10 nM) and weak (IC50 > 1000 nM) compounds
+- **DESeq2**: Differential gene expression simulation
+- **Proteomics**: Protein-level analysis
+
 ---
 
 ## 🌐 Live Demo
@@ -118,15 +140,18 @@ Try the platform live: [**SEGULAH AI**](https://segulah-ai.streamlit.app)
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/segulah-ai.git
-cd segulah-ai
+git clone https://github.com/Lubanah-Younes/Segulah-AI.git
+cd Segulah-AI
 
 # Create virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
+# Install Python dependencies
 pip install -r web_app/requirements.txt
+
+# Install R dependencies (optional)
+Rscript -e "install.packages(c('DESeq2', 'ggplot2', 'limma'))"
 
 # Run the app
 streamlit run web_app/app.py
@@ -141,12 +166,16 @@ If you use SEGULAH AI in your research, please cite:
 
 text
 SEGULAH AI: AI-Powered Drug Discovery Platform for EGFR Inhibition.
-Available at: https://github.com/your-username/segulah-ai
+LUBANAH YOUNES (2026). Available at: https://github.com/Lubanah-Younes/Segulah-AI
 📄 License
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT-CR License - see the LICENSE file for details.
+
+Commercial use requires explicit written permission from the copyright holder.
 
 👩‍💻 Author
-LUBANAH YOUNES 081227
+LUBANAH YOUNES
+GitHub: @Lubanah-Younes
+Email: lubanahyounes@gmail.com
 
 Accelerating drug discovery through artificial intelligence.
 
@@ -159,5 +188,9 @@ Streamlit for the web framework
 
 TensorFlow for deep learning capabilities
 
+R Core Team for statistical computing tools
+
 📞 Contact
-lubanahyounes@gmai.com
+For questions, feedback, or collaboration opportunities:
+
+Email: lubanahyounes@gmail.com
