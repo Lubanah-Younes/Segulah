@@ -1,0 +1,35 @@
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# RDKit installed files
+rdkit/
+rdkit-stubs/
+rdkit.libs/
+
+# Large models and data (optional)
+*.pkl
+*.keras
+*.pbix
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Results (optional - keep if you want)
+# results/
+
+# Generated files
+*.log
+*.tmp

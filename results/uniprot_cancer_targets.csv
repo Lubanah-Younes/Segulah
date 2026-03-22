@@ -1,0 +1,15 @@
+uniprot_id,protein_name,gene_name,cancers,function
+P00533,Epidermal growth factor receptor,EGFR,"Lung, breast, colorectal cancer",(Microbial infection) Acts as a receptor for hepatitis C virus (HCV) in hepatocytes and facilitates its cell entry. Mediates HCV entry by promoting th
+P04637,Cellular tumor antigen p53,TP53,Multiple cancers,"Multifunctional transcription factor that induces cell cycle arrest, DNA repair or apoptosis upon binding to its target DNA sequence (PubMed:11025664,"
+P04626,Receptor tyrosine-protein kinase erbB-2,ERBB2,Breast cancer,In the nucleus is involved in transcriptional regulation. Associates with the 5'-TCAAATTC-3' sequence in the PTGS2/COX-2 promoter and activates its tr
+P35968,Vascular endothelial growth factor receptor 2,KDR,Angiogenesis in cancer,"Tyrosine-protein kinase that acts as a cell-surface receptor for VEGFA, VEGFC and VEGFD. Plays an essential role in the regulation of angiogenesis, va"
+P15692,"Vascular endothelial growth factor A, long form",VEGFA,Angiogenesis,"Binds to the KDR receptor but does not activate downstream signaling pathways, does not activate angiogenesis and inhibits tumor growth"
+P07949,Proto-oncogene tyrosine-protein kinase receptor Ret,RET,"Thyroid, lung cancer",Isoform 1 in complex with GFRAL induces higher activation of MAPK-signaling pathway than isoform 2 in complex with GFRAL
+P08581,Hepatocyte growth factor receptor,MET,"Lung, gastric cancer","(Microbial infection) Acts as a receptor for Listeria monocytogenes internalin InlB, mediating entry of the pathogen into cells"
+P09619,Platelet-derived growth factor receptor beta,PDGFRB,"Leukemia, glioma","Tyrosine-protein kinase that acts as a cell-surface receptor for homodimeric PDGFB and PDGFD and for heterodimers formed by PDGFA and PDGFB, and plays"
+P04049,RAF proto-oncogene serine/threonine-protein kinase,RAF1,"Melanoma, colorectal","Serine/threonine-protein kinase that acts as a regulatory link between the membrane-associated Ras GTPases and the MAPK/ERK cascade, and this critical"
+P11802,Cyclin-dependent kinase 4,CDK4,"Breast, melanoma",Ser/Thr-kinase component of cyclin D-CDK4 (DC) complexes that phosphorylate and inhibit members of the retinoblastoma (RB) protein family including RB
+P00533,Epidermal growth factor receptor,EGFR,"Lung, breast, colorectal cancer",(Microbial infection) Acts as a receptor for hepatitis C virus (HCV) in hepatocytes and facilitates its cell entry. Mediates HCV entry by promoting th
+P04626,Receptor tyrosine-protein kinase erbB-2,HER2,Breast cancer,In the nucleus is involved in transcriptional regulation. Associates with the 5'-TCAAATTC-3' sequence in the PTGS2/COX-2 promoter and activates its tr
+P35968,Vascular endothelial growth factor receptor 2,VEGFR2,Angiogenesis,"Tyrosine-protein kinase that acts as a cell-surface receptor for VEGFA, VEGFC and VEGFD. Plays an essential role in the regulation of angiogenesis, va"
+P07949,Proto-oncogene tyrosine-protein kinase receptor Ret,RET,Thyroid cancer,Isoform 1 in complex with GFRAL induces higher activation of MAPK-signaling pathway than isoform 2 in complex with GFRAL

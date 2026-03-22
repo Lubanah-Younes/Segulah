@@ -1,0 +1,2 @@
+total_compounds,unique_molecules,high_potency_percentage,mean_ic50_nM,median_ic50_nM,best_ic50_nM,best_molecule
+388,307,18.298969072164947,123505.69645876289,1430.0,0.006,CHEMBL53711

@@ -1,0 +1,6 @@
+category,count
+Low (>10 uM),144
+High (IC50 < 10 nM),71
+Low-Medium (1-10 uM),61
+Medium (100-1000 nM),57
+Medium-High (10-100 nM),55

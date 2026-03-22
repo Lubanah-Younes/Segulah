@@ -1,0 +1,10 @@
+metric,value
+Total Compounds,388
+Unique Molecules,307
+High Potency Compounds (IC50 < 10 nM),71
+High Potency Percentage,18.3%
+Mean IC50 (nM),123506
+Median IC50 (nM),1430
+Best IC50 (nM),0.006
+Best Molecule,CHEMBL53711
+Lead Candidates Identified,20

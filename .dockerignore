@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pkl
+*.keras
+*.pbix
+results/
+data/raw/
+.venv/
+.git/
+*.csv
+*.png
+*.txt

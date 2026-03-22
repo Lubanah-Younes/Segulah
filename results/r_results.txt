@@ -1,0 +1,17 @@
+     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+      0.0      29.8    1430.0  123505.7   63750.0 6500000.0 
+
+       High Medium-High      Medium  Low-Medium         Low 
+         71          59          57          64         137 
+
+	Welch Two Sample t-test
+
+data:  df$pchembl_value[df$ic50_nM < 10 & !is.na(df$pchembl_value)] and df$pchembl_value[df$ic50_nM > 1000 & !is.na(df$pchembl_value)]
+t = 45.143, df = 141.61, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 3.483415 3.802472
+sample estimates:
+mean of x mean of y 
+ 8.737286  5.094342 
+

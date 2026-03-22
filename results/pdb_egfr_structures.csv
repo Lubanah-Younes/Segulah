@@ -1,0 +1,9 @@
+pdb_id,inhibitor,resolution,method,ligand_count
+1M17,Gefitinib (ZD1839),[2.6],X-ray,0
+2ITN,Erlotinib (Tarceva),[2.47],X-ray,0
+3POZ,Afatinib,[1.5],X-ray,0
+4HJO,Osimertinib (AZD9291),[2.75],X-ray,0
+5HG5,Lapatinib,[1.52],X-ray,0
+5UGC,Neratinib,[1.58],X-ray,0
+6DUK,Dacomitinib,[2.2],X-ray,0
+4WKQ,CO-1686 (Rociletinib),[1.85],X-ray,0
