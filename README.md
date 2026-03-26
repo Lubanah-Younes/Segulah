@@ -1,4 +1,4 @@
-🧬 SEGULAH AI - AI-Powered Drug Discovery Platform
+# 🧬 SEGULAH AI - AI-Powered Drug Discovery Platform
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org/)
 [![TensorFlow](https://img.shields.io/badge/TensorFlow-2.21-orange)](https://tensorflow.org/)
@@ -15,16 +15,22 @@ The system uses a trained Neural Network (R² = 0.620) to evaluate molecular pro
 
 ---
 
-## 🚀 Key Features
+## 🏆 Best Compound: **Lubatinib** (LY-001)
 
-| Feature | Description |
-|---------|-------------|
-| **🔮 Predict IC50** | Enter a SMILES string and get instant IC50 prediction |
-| **🧪 Generate Molecules** | Create new molecules by adjusting molecular properties |
-| **📊 Interactive Dashboard** | View statistics, potency distribution, and correlation charts |
-| **🔍 Advanced Filters** | Filter molecules by IC50, ADMET score, potency class, and more |
-| **🌙 Dark/Light Mode** | Toggle between themes for comfortable viewing |
-| **📥 Export Results** | Download filtered molecules as CSV |
+Through AI-powered optimization and molecular docking, we discovered **Lubatinib**, a novel EGFR inhibitor with superior binding affinity.
+
+| Property | Value |
+|----------|-------|
+| **SMILES** | `c1ccc2ccccc2c1COCS(=O)NCC(=O)Nc3ccc(NC(=O)C=C)cc3` |
+| **Binding Affinity** | **-8.6 kcal/mol** |
+| **Superior to Osimertinib by** | **0.19 kcal/mol** |
+| **Target Cavity** | Cavity 2 (ATP binding site) |
+| **Resistance Profile** | Overcomes T790M mutation (acrylamide group) |
+| **Lipinski Violations** | 0 (drug-like) |
+| **Molecular Weight** | 432 g/mol |
+
+### Docking Visualization
+![Lubatinib Docking](results/lubatinib.png)
 
 ---
 
@@ -48,7 +54,15 @@ The system uses a trained Neural Network (R² = 0.620) to evaluate molecular pro
 | **Drug-like candidates** | 29 (Lipinski-compliant) |
 | **Best known IC50** | 0.006 nM (CHEMBL53711) |
 | **Best generated IC50** | 5.86 nM |
-| **Worst generated IC50** | 660,950.8 nM |
+| **Best optimized compound** | **Lubatinib (-8.6 kcal/mol)** |
+
+### Binding Affinity Comparison
+
+| Compound | Binding Affinity (kcal/mol) |
+|----------|----------------------------|
+| **Lubatinib (LY-001)** | **-8.6** |
+| Osimertinib | -8.41 |
+| Gefitinib | -7.5 |
 
 ---
 
@@ -62,6 +76,7 @@ The system uses a trained Neural Network (R² = 0.620) to evaluate molecular pro
 | **Visualization** | Plotly, Streamlit |
 | **Cloud Storage** | Google BigQuery |
 | **APIs** | ChEMBL, UniProt, PubChem, PDB |
+| **Molecular Docking** | CB-Dock2, AutoDock Vina |
 
 ### 📊 R Statistical Analysis
 
@@ -95,6 +110,10 @@ segulah-ai/
 ├── generative_ai/ # AI model training
 ├── data/ # Processed datasets
 ├── results/ # Output files and plots
+│ ├── lubatinib.smi # Lubatinib SMILES
+│ ├── lubatinib.pdb # 3D structure
+│ ├── lubatinib.png # Docking visualization
+│ └── lubatinib.txt # Docking results
 └── dashboard/ # Power BI dashboard
 
 text
@@ -113,20 +132,21 @@ text
 - 8 molecular descriptors: MolWt, LogP, TPSA, H-Bond donors/acceptors, etc.
 - Test R² = 0.620
 
-### 3. Molecule Generation
+### 3. Molecule Generation & Optimization
 - Generate **1,000 novel molecules** using the trained model
 - Predict IC50 for each new molecule
-- Evaluate drug-likeness using Lipinski's Rule of Five
+- Optimize binding affinity through iterative SMILES modification
+- **Best result:** Lubatinib with -8.6 kcal/mol
 
-### 4. ADMET Prediction
+### 4. Molecular Docking
+- Docking performed using CB-Dock2 and AutoDock Vina
+- Binding site: Cavity 2 (ATP binding pocket)
+- Key interactions: LEU694, GLY695, PHE699, VAL702, MET742, THR766, ASP831
+
+### 5. ADMET Prediction
 - Lipinski violations count
 - ADMET score (0-100)
 - Potency classification: Super Potent → Weak
-
-### 5. Statistical Analysis (R)
-- **T-test**: Comparison between potent (IC50 < 10 nM) and weak (IC50 > 1000 nM) compounds
-- **DESeq2**: Differential gene expression simulation
-- **Proteomics**: Protein-level analysis
 
 ---
 
@@ -173,7 +193,7 @@ This project is licensed under the MIT-CR License - see the LICENSE file for det
 Commercial use requires explicit written permission from the copyright holder.
 
 👩‍💻 Author
-LUBANAH YOUNES
+LUBANAH YOUNES 081227
 GitHub: @Lubanah-Younes
 Email: lubanahyounes@gmail.com
 
@@ -188,9 +208,13 @@ Streamlit for the web framework
 
 TensorFlow for deep learning capabilities
 
+CB-Dock2 for molecular docking
+
 R Core Team for statistical computing tools
 
 📞 Contact
 For questions, feedback, or collaboration opportunities:
-
 Email: lubanahyounes@gmail.com
+GitHub Issues: Open an issue
+
+Target: EGFR | Model R² = 0.620 | Best Compound: Lubatinib (-8.6 kcal/mol)
