@@ -150,11 +150,6 @@ text
 
 ---
 
-## 🌐 Live Demo
-
-Try the platform live: [**SEGULAH AI**](https://segulah-ai.streamlit.app)
-
----
 
 ## 📥 Installation (Local)
 
