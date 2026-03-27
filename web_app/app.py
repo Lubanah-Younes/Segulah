@@ -27,6 +27,27 @@ from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
+# Force English language
+st.markdown("""
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="google" content="notranslate">
+        <meta http-equiv="Content-Language" content="en">
+        <meta name="language" content="en">
+    </head>
+    <style>
+        * {
+            direction: ltr !important;
+            text-align: left !important;
+            unicode-bidi: normal !important;
+        }
+        .stApp, .stMarkdown, .stSelectbox, .stSidebar {
+            direction: ltr !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # Try to import py3Dmol for docking viewer
 try:
     import py3Dmol
@@ -41,7 +62,7 @@ except ImportError:
 # ============================================
 st.set_page_config(
     page_title="SEGULAH AI - Drug Discovery Platform",
-    page_icon="🧬",
+    page_icon="⚛️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -101,7 +122,7 @@ if 'notifications' not in st.session_state:
 if 'notifications_shown' not in st.session_state:
     st.session_state.notifications_shown = False
 if 'current_option' not in st.session_state:
-    st.session_state.current_option = "🏠 Dashboard"
+    st.session_state.current_option = " Dashboard"
 if 'comparison_compounds' not in st.session_state:
     st.session_state.comparison_compounds = []
 if 'reports_generated' not in st.session_state:
@@ -128,14 +149,14 @@ def request_push_permission():
     """
     st.components.v1.html(push_html, height=0)
 
-def send_push_notification(title, body, icon="🧬"):
+def send_push_notification(title, body, icon="⚛️"):
     if st.session_state.push_notifications_enabled:
         push_html = f"""
         <script>
             if ('Notification' in window && Notification.permission === 'granted') {{
                 new Notification("{title}", {{
                     body: "{body}",
-                    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🧬%3C/text%3E%3C/svg%3E"
+                    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E⚛️%3C/text%3E%3C/svg%3E"
                 }});
             }}
         </script>
@@ -293,7 +314,7 @@ def get_logo_html_transparent(width=35):
             return f'<img src="data:image/png;base64,{logo_base64}" width="{width}" style="border-radius: 6px;">'
         except:
             pass
-    return "🧬"
+    return "⚛️"
 
 # ============================================
 # 3D COORDINATES FUNCTION
@@ -377,8 +398,154 @@ def get_available_pdb_files():
     
     return pdb_files
 
+def predict_pk_parameters(mol):
+    if mol is None:
+        return {}
+    logp = Descriptors.MolLogP(mol)
+    return {
+        'Half_Life (h)': max(0.5, min(24, 2.5 + 0.5 * logp)),
+        'Clearance (L/h)': max(0.2, min(10, 0.8 + 0.3 * logp)),
+        'Vd (L/kg)': max(0.2, min(5, 0.5 + 0.2 * logp)),
+        'Bioavailability (%)': max(10, min(95, 70 - 5 * abs(logp - 2.5)))
+    }
+
+def predict_toxicity(mol):
+    if mol is None:
+        return {}
+    mw = Descriptors.MolWt(mol)
+    logp = Descriptors.MolLogP(mol)
+    return {
+        'hERG Risk': 'High' if logp > 4.5 else 'Medium' if logp > 3 else 'Low',
+        'Hepatotoxicity': 'High' if mw > 450 else 'Medium' if mw > 350 else 'Low',
+        'Genotoxicity': 'High' if logp > 4 and mw > 400 else 'Low',
+        'Carcinogenicity': 'Medium' if logp > 3.5 else 'Low'
+    }
+
+def get_mutation_resistance(smiles, mutations=['T790M', 'L858R', 'C797S']):
+    mol = Chem.MolFromSmiles(smiles) if isinstance(smiles, str) else smiles
+    if mol is None:
+        return {}
+    logp = Descriptors.MolLogP(mol)
+    resistance = {}
+    for mut in mutations:
+        if mut == 'T790M':
+            score = max(0, min(100, 40 + 15 * (logp - 2)))
+        elif mut == 'L858R':
+            score = max(0, min(100, 35 + 12 * (logp - 2)))
+        elif mut == 'C797S':
+            score = max(0, min(100, 60 + 10 * (logp - 2)))
+        else:
+            score = 50
+        resistance[mut] = score
+    return resistance
+
 # ============================================
-# CSS - COMPLETE WITH ENHANCED RESPONSIVE & READING MODE
+# API FUNCTIONS
+# ============================================
+@st.cache_data(ttl=3600)
+def fetch_chembl_data(compound_name):
+    try:
+        url = f"https://www.ebi.ac.uk/chembl/api/data/molecule/search?q={compound_name}&format=json"
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get('molecules', [])[:5]
+    except:
+        pass
+    return []
+
+@st.cache_data(ttl=3600)
+def fetch_pubchem_data(smiles):
+    try:
+        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{smiles}/property/MolecularWeight,LogP,HBondDonorCount,HBondAcceptorCount/JSON"
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            return response.json()
+    except:
+        pass
+    return None
+
+# ============================================
+# REPORT GENERATION
+# ============================================
+def generate_html_report(compound_name, smiles, properties, docking_results, pk_params, toxicity, resistance):
+    current_year = datetime.now().year
+    
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>SEGULAH AI Report - {compound_name}</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }}
+            .container {{ max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }}
+            h1 {{ color: #2563eb; border-bottom: 3px solid #2563eb; padding-bottom: 10px; }}
+            .footer {{ text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 12px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>⚛️ SEGULAH AI Drug Discovery Report</h1>
+            <p><strong>Generated:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+            <p><strong>Compound:</strong> {compound_name}</p>
+            <p><strong>SMILES:</strong> <code>{smiles}</code></p>
+    """
+    
+    if properties:
+        html += "<h2>Molecular Properties</h2>"
+        html += "<table border='1' cellpadding='8' style='border-collapse: collapse; width: 100%;'>"
+        for key, val in properties.items():
+            html += f"业<nth>{key}</th>\\n<td>{val}</td>\\n</tr>"
+        html += "</table>"
+    
+    html += f"""
+            <div class="footer">
+                <p>Powered by LUBANAH H. YOUNES | Target: EGFR | Model R² = 0.620</p>
+                <p>© {current_year} SEGULAH AI</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return html
+
+# ============================================
+# FOOTER
+# ============================================
+def get_footer():
+    current_year = datetime.now().year
+    if st.session_state.dark_mode:
+        text_color = "#94a3b8"
+        accent = "#3b82f6"
+    else:
+        text_color = "#475569"
+        accent = "#3b82f6"
+    
+    return f"""
+    <div class="footer">
+        <div>
+            <span style="font-weight: 600; color: {accent};">LUBANAH H. YOUNES</span>
+            <span style="color: {text_color};">|</span>
+            <span style="color: {text_color};">💻 Computational Drug Discovery</span>
+            <span style="color: {text_color};">|</span>
+            <span style="color: {text_color};">🤖 AI Researcher</span>
+            <span style="color: {text_color};">|</span>
+            <span style="color: {text_color};">🔬 Pharmaceutical Innovation</span>
+        </div>
+        <div style="margin-top: 2px;">
+            <span style="color: {text_color};">© {current_year} SEGULAH AI</span>
+            <span style="color: {text_color};">|</span>
+            <span style="color: {text_color};">🎯 Target: EGFR</span>
+            <span style="color: {text_color};">|</span>
+            <span style="color: {text_color};">📊 Model R² = 0.620</span>
+            <span style="color: {text_color};">|</span>
+            <span style="color: {accent};">⭐ Lubatinib™</span>
+        </div>
+    </div>
+    """
+
+# ============================================
+# CSS - COMPLETE WITH ENHANCED DARK MODE FIX
 # ============================================
 if st.session_state.dark_mode:
     if st.session_state.reading_mode:
@@ -386,11 +553,11 @@ if st.session_state.dark_mode:
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Georgia', 'Times New Roman', serif; }
             .stApp { background: #1a1a2e; }
-            p, li, .stMarkdown { font-size: 1.1rem !important; line-height: 1.8 !important; }
-            h1 { font-size: 2.5rem !important; }
-            h2 { font-size: 2rem !important; }
-            h3 { font-size: 1.5rem !important; }
-            .card, .metric-card { background: rgba(30, 41, 59, 0.8) !important; }
+            p, li, .stMarkdown { font-size: 1.1rem !important; line-height: 1.8 !important; color: #e2e8f0 !important; }
+            h1 { font-size: 2.5rem !important; color: white !important; }
+            h2 { font-size: 2rem !important; color: white !important; }
+            h3 { font-size: 1.5rem !important; color: white !important; }
+            .card, .metric-card { background: #1e293b !important; border: 1px solid #334155 !important; }
             .hero { background: #0f172a; border: 1px solid #3b82f6; }
         </style>
         """
@@ -400,43 +567,225 @@ if st.session_state.dark_mode:
             * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', -apple-system, sans-serif; }
             .stApp { background: #0a0c10; }
             
-            .dna-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; opacity: 0.08; }
-            .dna-bg::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath fill='none' stroke='%233b82f6' stroke-width='1' d='M30,30 L170,170 M170,30 L30,170 M50,10 L150,190 M150,10 L50,190 M70,0 L130,200 M130,0 L70,200'/%3E%3C/svg%3E"); background-repeat: repeat; background-size: 60px 60px; animation: slowMove 60s linear infinite; }
-            @keyframes slowMove { 0% { transform: translateX(0) translateY(0); } 100% { transform: translateX(100px) translateY(100px); } }
+            /* ========== FIX ALL WHITE BOXES ========== */
+            .stAlert, .stInfo, .stSuccess, .stWarning, .stError {
+                background: #1e293b !important;
+                border-left: 4px solid #3b82f6 !important;
+            }
+            .stAlert > div, .stAlert p {
+                color: #e2e8f0 !important;
+            }
             
-            [data-testid="stSidebar"] { background: #0f172a !important; border-right: 1px solid rgba(255,255,255,0.05); }
-            [data-testid="stSidebar"] * { color: #e2e8f0 !important; }
+            /* Fix metric cards */
+            .metric-card {
+                background: #1e293b !important;
+                border: 1px solid #334155 !important;
+                border-radius: 16px !important;
+                padding: 20px !important;
+            }
+            .metric-value {
+                color: #f1f5f9 !important;
+                font-size: 2rem !important;
+                font-weight: 700 !important;
+            }
+            .metric-label {
+                color: #94a3b8 !important;
+                font-size: 0.75rem !important;
+            }
             
-            .hero { background: linear-gradient(135deg, #0f172a, #1e293b); border-radius: 24px; padding: 40px 32px; margin-bottom: 32px; border: 1px solid rgba(255,255,255,0.05); }
-            .hero h1 { font-size: 3rem; font-weight: 700; color: white; margin-bottom: 8px; }
-            .hero p { color: #94a3b8; font-size: 1rem; }
+            /* Fix regular cards */
+            .card {
+                background: #1e293b !important;
+                border: 1px solid #334155 !important;
+                border-radius: 20px !important;
+                padding: 24px !important;
+            }
             
-            .card { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(10px); border-radius: 20px; padding: 24px; border: 1px solid rgba(255,255,255,0.08); transition: all 0.2s ease; }
-            .card:hover { border-color: #3b82f6; transform: translateY(-2px); }
+            /* Fix expander */
+            .streamlit-expanderHeader {
+                background: #1e293b !important;
+                color: #e2e8f0 !important;
+                border: 1px solid #334155 !important;
+                border-radius: 12px !important;
+            }
+            .streamlit-expanderContent {
+                background: #0f172a !important;
+                border-radius: 12px !important;
+            }
             
-            .metric-card { background: rgba(30, 41, 59, 0.5); border-radius: 20px; padding: 20px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
-            .metric-value { font-size: 2rem; font-weight: 700; color: white; }
-            .metric-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; }
+            /* Fix dataframe */
+            .dataframe, .stDataFrame {
+                background: #1e293b !important;
+                border: 1px solid #334155 !important;
+                border-radius: 16px !important;
+            }
+            .dataframe th {
+                background: #0f172a !important;
+                color: white !important;
+            }
+            .dataframe td {
+                color: #cbd5e1 !important;
+            }
             
-            .stButton > button { background: #3b82f6 !important; color: white !important; border: none !important; border-radius: 40px !important; padding: 10px 24px !important; font-weight: 500 !important; transition: all 0.2s !important; }
-            .stButton > button:hover { background: #2563eb !important; transform: scale(1.02); }
+            /* ========== FOOTER - BOTTOM RIGHT ========== */
+            .footer {
+                position: fixed !important;
+                bottom: 0 !important;
+                right: 0 !important;
+                left: auto !important;
+                top: auto !important;
+                background: #0f172a !important;
+                padding: 6px 16px !important;
+                border-top: 1px solid #334155 !important;
+                border-left: 1px solid #334155 !important;
+                border-radius: 12px 0 0 0 !important;
+                z-index: 999 !important;
+                font-size: 0.7rem !important;
+                text-align: right !important;
+            }
             
-            .dataframe { background: rgba(30, 41, 59, 0.5) !important; border-radius: 16px !important; border: 1px solid rgba(255,255,255,0.08) !important; }
-            .dataframe th { background: #1e293b !important; color: white !important; }
-            .dataframe td { color: #cbd5e1 !important; }
+            .footer div {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: flex-end !important;
+                gap: 6px !important;
+                flex-wrap: wrap !important;
+            }
             
-            h1, h2, h3 { color: white !important; font-weight: 600 !important; }
+            /* Space for footer */
+            .main .block-container {
+                padding-bottom: 60px !important;
+            }
             
-            ::-webkit-scrollbar { width: 8px; height: 8px; }
-            ::-webkit-scrollbar-track { background: #1e293b; }
-            ::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 4px; }
+            /* Sidebar */
+            [data-testid="stSidebar"] {
+                background: #0f172a !important;
+                border-right: 1px solid #1e293b !important;
+            }
+            [data-testid="stSidebar"] * {
+                color: #e2e8f0 !important;
+            }
             
-            .footer { text-align: center; padding: 32px 24px; margin-top: 48px; border-top: 1px solid rgba(255,255,255,0.05); }
+            /* Tabs */
+            .stTabs [data-baseweb="tab-list"] {
+                background: #1e293b !important;
+                border-radius: 12px !important;
+                padding: 6px !important;
+            }
+            .stTabs [data-baseweb="tab"] {
+                background: #0f172a !important;
+                color: #94a3b8 !important;
+                border-radius: 8px !important;
+                padding: 10px 20px !important;
+            }
+            .stTabs [aria-selected="true"] {
+                background: #3b82f6 !important;
+                color: white !important;
+            }
+            .stTabs [data-baseweb="tab-panel"] {
+                background: transparent !important;
+                padding-top: 20px !important;
+            }
             
-            .fab { position: fixed; bottom: 30px; right: 30px; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 1000; font-size: 24px; text-decoration: none; transition: all 0.3s ease; }
-            .fab:hover { transform: scale(1.1); }
+            /* Text */
+            .stMarkdown, .stMarkdown p, p, li, label {
+                color: #e2e8f0 !important;
+            }
+            h1, h2, h3, h4, h5, h6 {
+                color: white !important;
+            }
             
-            @media (max-width: 768px) { .hero h1 { font-size: 1.8rem; } .metric-value { font-size: 1.2rem; } .card { padding: 12px; } .hero { padding: 20px; } .stButton > button { padding: 8px 16px; } }
+            /* Buttons */
+            .stButton > button {
+                background: #3b82f6 !important;
+                color: white !important;
+                border-radius: 40px !important;
+            }
+            
+            /* Inputs */
+            .stTextInput input, .stTextArea textarea {
+                background: #1e293b !important;
+                border: 1px solid #334155 !important;
+                color: #e2e8f0 !important;
+            }
+            
+            /* Hero */
+            .hero {
+                background: linear-gradient(135deg, #0f172a, #1e293b) !important;
+                border: 1px solid #334155 !important;
+            }
+            .hero h1 {
+                color: white !important;
+            }
+            .hero p {
+                color: #94a3b8 !important;
+            }
+            
+            /* DNA Background */
+            .dna-bg {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                z-index: -1;
+                pointer-events: none;
+                opacity: 0.08;
+            }
+            .dna-bg::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath fill='none' stroke='%233b82f6' stroke-width='1' d='M30,30 L170,170 M170,30 L30,170 M50,10 L150,190 M150,10 L50,190 M70,0 L130,200 M130,0 L70,200'/%3E%3C/svg%3E");
+                background-repeat: repeat;
+                background-size: 60px 60px;
+                animation: slowMove 60s linear infinite;
+            }
+            @keyframes slowMove {
+                0% { transform: translateX(0) translateY(0); }
+                100% { transform: translateX(100px) translateY(100px); }
+            }
+            
+            /* Scrollbar */
+            ::-webkit-scrollbar {
+                width: 8px;
+            }
+            ::-webkit-scrollbar-track {
+                background: #1e293b;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: #3b82f6;
+                border-radius: 4px;
+            }
+            
+            /* FAB Button */
+            .fab {
+                position: fixed;
+                bottom: 30px;
+                right: 30px;
+                background: linear-gradient(135deg, #3b82f6, #2563eb);
+                color: white;
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                z-index: 1000;
+                font-size: 24px;
+                text-decoration: none;
+            }
+            
+            @media (max-width: 768px) {
+                .hero h1 { font-size: 1.8rem; }
+                .metric-value { font-size: 1.2rem; }
+                .card { padding: 12px; }
+                .hero { padding: 20px; }
+            }
         </style>
         <div class="dna-bg"></div>
         <a href="#" class="fab">↑</a>
@@ -453,6 +802,8 @@ else:
             h3 { font-size: 1.5rem !important; color: #2c3e50 !important; }
             .card, .metric-card { background: #fffaf0 !important; border: 1px solid #e2d5c0; }
             .hero { background: #f5e6d3; border: 1px solid #d4b88c; }
+            .footer { position: fixed; bottom: 0; right: 0; background: #f5e6d3; padding: 6px 16px; border-top: 1px solid #d4b88c; border-left: 1px solid #d4b88c; border-radius: 12px 0 0 0; z-index: 999; font-size: 0.7rem; }
+            .main .block-container { padding-bottom: 60px; }
         </style>
         """
     else:
@@ -460,40 +811,20 @@ else:
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', -apple-system, sans-serif; }
             .stApp { background: #f8fafc; }
-            
             .dna-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; opacity: 0.05; }
             .dna-bg::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath fill='none' stroke='%233b82f6' stroke-width='1' d='M30,30 L170,170 M170,30 L30,170 M50,10 L150,190 M150,10 L50,190 M70,0 L130,200 M130,0 L70,200'/%3E%3C/svg%3E"); background-repeat: repeat; background-size: 60px 60px; animation: slowMove 60s linear infinite; }
             @keyframes slowMove { 0% { transform: translateX(0) translateY(0); } 100% { transform: translateX(100px) translateY(100px); } }
-            
             [data-testid="stSidebar"] { background: white !important; border-right: 1px solid #e2e8f0; }
-            [data-testid="stSidebar"] * { color: #0f172a !important; }
-            
             .hero { background: linear-gradient(135deg, #f1f5f9, #e2e8f0); border-radius: 24px; padding: 40px 32px; margin-bottom: 32px; }
-            .hero h1 { font-size: 3rem; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
-            .hero p { color: #475569; font-size: 1rem; }
-            
-            .card { background: white; border-radius: 20px; padding: 24px; border: 1px solid #e2e8f0; transition: all 0.2s ease; }
-            .card:hover { border-color: #3b82f6; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-            
+            .hero h1 { font-size: 3rem; font-weight: 700; color: #0f172a; }
+            .card { background: white; border-radius: 20px; padding: 24px; border: 1px solid #e2e8f0; }
             .metric-card { background: white; border-radius: 20px; padding: 20px; text-align: center; border: 1px solid #e2e8f0; }
             .metric-value { font-size: 2rem; font-weight: 700; color: #0f172a; }
-            .metric-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; }
-            
-            .stButton > button { background: #3b82f6 !important; color: white !important; border: none !important; border-radius: 40px !important; padding: 10px 24px !important; font-weight: 500 !important; }
-            .stButton > button:hover { background: #2563eb !important; }
-            
-            h1, h2, h3 { color: #0f172a !important; font-weight: 600 !important; }
-            
-            ::-webkit-scrollbar { width: 8px; height: 8px; }
-            ::-webkit-scrollbar-track { background: #e2e8f0; }
-            ::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 4px; }
-            
-            .footer { text-align: center; padding: 32px 24px; margin-top: 48px; border-top: 1px solid #e2e8f0; }
-            
-            .fab { position: fixed; bottom: 30px; right: 30px; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 1000; font-size: 24px; text-decoration: none; transition: all 0.3s ease; }
-            .fab:hover { transform: scale(1.1); }
-            
-            @media (max-width: 768px) { .hero h1 { font-size: 1.8rem; } .metric-value { font-size: 1.2rem; } .card { padding: 12px; } .hero { padding: 20px; } .stButton > button { padding: 8px 16px; } }
+            .footer { position: fixed; bottom: 0; right: 0; background: white; padding: 6px 16px; border-top: 1px solid #e2e8f0; border-left: 1px solid #e2e8f0; border-radius: 12px 0 0 0; z-index: 999; font-size: 0.7rem; }
+            .main .block-container { padding-bottom: 60px; }
+            .stButton > button { background: #3b82f6 !important; color: white !important; border-radius: 40px !important; }
+            .fab { position: fixed; bottom: 30px; right: 30px; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1000; font-size: 24px; text-decoration: none; }
+            @media (max-width: 768px) { .hero h1 { font-size: 1.8rem; } .metric-value { font-size: 1.2rem; } .card { padding: 12px; } }
         </style>
         <div class="dna-bg"></div>
         <a href="#" class="fab">↑</a>
@@ -594,13 +925,12 @@ def load_new_molecules():
 @st.cache_data
 def load_lubatinib_data():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    parent_dir = os.path.dirname(base_dir)
     
     lubatinib_files = {
-        'pdb': os.path.join(parent_dir, "results", "lubatinib.pdb"),
-        'png': os.path.join(parent_dir, "results", "lubatinib.png"),
-        'smi': os.path.join(parent_dir, "results", "lubatinib.smi"),
-        'txt': os.path.join(parent_dir, "results", "lubatinib.txt")
+        'pdb': os.path.join(base_dir, "results", "lubatinib.pdb"),
+        'png': os.path.join(base_dir, "results", "lubatinib.png"),
+        'smi': os.path.join(base_dir, "results", "lubatinib.smi"),
+        'txt': os.path.join(base_dir, "results", "lubatinib.txt")
     }
     
     data = {}
@@ -619,6 +949,30 @@ def load_lubatinib_data():
                 data[key] = None
         else:
             data[key] = None
+    
+    # If not found, try parent directory
+    if not any(data.values()):
+        parent_dir = os.path.dirname(base_dir)
+        parent_files = {
+            'pdb': os.path.join(parent_dir, "results", "lubatinib.pdb"),
+            'png': os.path.join(parent_dir, "results", "lubatinib.png"),
+            'smi': os.path.join(parent_dir, "results", "lubatinib.smi"),
+            'txt': os.path.join(parent_dir, "results", "lubatinib.txt")
+        }
+        for key, path in parent_files.items():
+            if os.path.exists(path) and data[key] is None:
+                try:
+                    if key == 'smi':
+                        with open(path, 'r') as f:
+                            data[key] = f.read().strip()
+                    elif key == 'txt':
+                        with open(path, 'r') as f:
+                            data[key] = f.read()
+                    else:
+                        data[key] = path
+                except:
+                    pass
+    
     return data
 
 # Show loading animation with progress
@@ -671,166 +1025,6 @@ def calculate_drug_likeness(mol):
     if Descriptors.TPSA(mol) <= 140: score += 10
     return score
 
-def parse_cbdock_results(txt_content):
-    results = {}
-    if txt_content:
-        import re
-        vina_scores = re.findall(r'Vina score:\s*(-?\d+\.?\d*)', txt_content)
-        if vina_scores:
-            results['binding_energy'] = float(vina_scores[0])
-        cavity_match = re.search(r'Cavity volume:\s*(\d+\.?\d*)', txt_content)
-        if cavity_match:
-            results['cavity_volume'] = float(cavity_match.group(1))
-        rmsd_match = re.search(r'RMSD:\s*(\d+\.?\d*)', txt_content)
-        if rmsd_match:
-            results['rmsd'] = float(rmsd_match.group(1))
-    return results
-
-def predict_pk_parameters(mol):
-    if mol is None:
-        return {}
-    logp = Descriptors.MolLogP(mol)
-    return {
-        'Half_Life (h)': max(0.5, min(24, 2.5 + 0.5 * logp)),
-        'Clearance (L/h)': max(0.2, min(10, 0.8 + 0.3 * logp)),
-        'Vd (L/kg)': max(0.2, min(5, 0.5 + 0.2 * logp)),
-        'Bioavailability (%)': max(10, min(95, 70 - 5 * abs(logp - 2.5)))
-    }
-
-def predict_toxicity(mol):
-    if mol is None:
-        return {}
-    mw = Descriptors.MolWt(mol)
-    logp = Descriptors.MolLogP(mol)
-    return {
-        'hERG Risk': 'High' if logp > 4.5 else 'Medium' if logp > 3 else 'Low',
-        'Hepatotoxicity': 'High' if mw > 450 else 'Medium' if mw > 350 else 'Low',
-        'Genotoxicity': 'High' if logp > 4 and mw > 400 else 'Low',
-        'Carcinogenicity': 'Medium' if logp > 3.5 else 'Low'
-    }
-
-def get_mutation_resistance(smiles, mutations=['T790M', 'L858R', 'C797S']):
-    mol = Chem.MolFromSmiles(smiles) if isinstance(smiles, str) else smiles
-    if mol is None:
-        return {}
-    logp = Descriptors.MolLogP(mol)
-    resistance = {}
-    for mut in mutations:
-        if mut == 'T790M':
-            score = max(0, min(100, 40 + 15 * (logp - 2)))
-        elif mut == 'L858R':
-            score = max(0, min(100, 35 + 12 * (logp - 2)))
-        elif mut == 'C797S':
-            score = max(0, min(100, 60 + 10 * (logp - 2)))
-        else:
-            score = 50
-        resistance[mut] = score
-    return resistance
-
-# ============================================
-# API FUNCTIONS
-# ============================================
-@st.cache_data(ttl=3600)
-def fetch_chembl_data(compound_name):
-    try:
-        url = f"https://www.ebi.ac.uk/chembl/api/data/molecule/search?q={compound_name}&format=json"
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            return data.get('molecules', [])[:5]
-    except:
-        pass
-    return []
-
-@st.cache_data(ttl=3600)
-def fetch_pubchem_data(smiles):
-    try:
-        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{smiles}/property/MolecularWeight,LogP,HBondDonorCount,HBondAcceptorCount/JSON"
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            return response.json()
-    except:
-        pass
-    return None
-
-# ============================================
-# REPORT GENERATION
-# ============================================
-def generate_html_report(compound_name, smiles, properties, docking_results, pk_params, toxicity, resistance):
-    current_year = datetime.now().year
-    
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>SEGULAH AI Report - {compound_name}</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }}
-            .container {{ max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }}
-            h1 {{ color: #2563eb; border-bottom: 3px solid #2563eb; padding-bottom: 10px; }}
-            .footer {{ text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 12px; }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>🧬 SEGULAH AI Drug Discovery Report</h1>
-            <p><strong>Generated:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-            <p><strong>Compound:</strong> {compound_name}</p>
-            <p><strong>SMILES:</strong> <code>{smiles}</code></p>
-    """
-    
-    if properties:
-        html += "<h2>Molecular Properties</h2>"
-        html += " 若干"
-        for key, val in properties.items():
-            html += f"<tr><th>{key}</th><td>{val}</td></tr>"
-        html += "</table>"
-    
-    html += f"""
-            <div class="footer">
-                <p>Powered by LUBANAH H. YOUNES | Target: EGFR | Model R² = 0.620</p>
-                <p>© {current_year} SEGULAH AI</p>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-    return html
-
-# ============================================
-# FOOTER
-# ============================================
-def get_footer():
-    current_year = datetime.now().year
-    if st.session_state.dark_mode:
-        text_color = "#94a3b8"
-        accent = "#3b82f6"
-    else:
-        text_color = "#475569"
-        accent = "#3b82f6"
-    
-    logo_html = get_logo_html_transparent(24)
-    
-    return f"""
-    <div class="footer">
-        <div style="margin-bottom: 12px;">
-            {logo_html}
-            <span style="font-size: 1.2rem; margin: 0 6px;">⚛️</span>
-            <span style="font-size: 1.2rem;">🔬</span>
-            <span style="font-size: 1.2rem; margin-left: 6px;">🧬</span>
-        </div>
-        <div style="font-size: 1rem; font-weight: 600; color: {accent}; margin-bottom: 6px;">
-            LUBANAH H. YOUNES
-        </div>
-        <div style="font-size: 0.7rem; color: {text_color};">
-            Computational Drug Discovery | AI Researcher | Pharmaceutical Innovation
-        </div>
-        <div style="font-size: 0.65rem; color: {text_color}; margin-top: 12px;">
-            © {current_year} SEGULAH AI | Target: EGFR | Model R² = 0.620 | Lubatinib™
-        </div>
-    </div>
-    """
-
 # ============================================
 # SIDEBAR
 # ============================================
@@ -854,9 +1048,9 @@ with st.sidebar:
     
     option = st.selectbox(
         "🔬 Navigation",
-        ["🏠 Dashboard", "🔮 Predict IC50", "🧪 Generate Molecules", "💊 Drug Formulation", 
-         "⭐ Lubatinib", "📊 Comparative Analysis", "🧬 Mutation Analysis", "🔬 Docking Viewer",
-         "📄 Reports", "🌐 API Integration", "📊 View Molecules", "📈 About"],
+        [" Dashboard", " Predict IC50", " Generate Molecules", " Drug Formulation", 
+         " Lubatinib", " Comparative Analysis", " Mutation Analysis", " Docking Viewer",
+         " Reports", " API Integration", " View Molecules", " About"],
         index=0,
         key="navigation_select"
     )
@@ -885,14 +1079,14 @@ if logo_large:
     with col2:
         st.markdown("""
         <div class="hero" style="margin-left: 0;">
-            <h1>🧬 SEGULAH AI</h1>
+            <h1>⚛️ SEGULAH AI</h1>
             <p>AI-Powered Drug Discovery Platform | Targeting EGFR | Complete Drug Development Suite</p>
         </div>
         """, unsafe_allow_html=True)
 else:
     st.markdown("""
     <div class="hero">
-        <h1>🧬 SEGULAH AI</h1>
+        <h1>⚛️ SEGULAH AI</h1>
         <p>AI-Powered Drug Discovery Platform | Targeting EGFR | Complete Drug Development Suite</p>
     </div>
     """, unsafe_allow_html=True)
@@ -904,7 +1098,7 @@ if not st.session_state.notifications_shown:
 # ============================================
 # DASHBOARD
 # ============================================
-if option == "🏠 Dashboard":
+if option == " Dashboard":
     st.markdown("## Dashboard")
     st.markdown("---")
     
@@ -1025,14 +1219,51 @@ if option == "🏠 Dashboard":
                 st.progress(drug_score/100)
                 st.caption(f"Drug Score: {drug_score}/100")
         with col3:
-            dock_results = parse_cbdock_results(lubatinib.get('txt', ''))
-            if dock_results:
-                st.metric("Binding Energy", f"{dock_results.get('binding_energy', 'N/A')} kcal/mol")
+            # Direct extraction from file - gets all cavities and picks best
+            txt_content = lubatinib.get('txt', '')
+            binding_energy = None
+            cavity_volume = None
+            cavity_id = None
+            all_results = []
+            
+            if txt_content:
+                import re
+                lines = txt_content.strip().split('\n')
+                
+                # Collect all cavities
+                for line in lines:
+                    match = re.match(r'^(\d+)\s+(\d+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(-?\d+\.?\d*)', line)
+                    if match:
+                        try:
+                            cid = int(match.group(1))
+                            cvol = float(match.group(2))
+                            cscore = float(match.group(9))
+                            all_results.append({
+                                'id': cid,
+                                'volume': cvol,
+                                'score': cscore
+                            })
+                        except:
+                            pass
+                
+                # Pick best cavity (lowest score = most negative)
+                if all_results:
+                    best = min(all_results, key=lambda x: x['score'])
+                    cavity_id = best['id']
+                    cavity_volume = best['volume']
+                    binding_energy = best['score']
+            
+            if binding_energy is not None:
+                st.metric("Binding Energy", f"{binding_energy} kcal/mol")
+                st.metric("Cavity Volume", f"{cavity_volume} Å³")
+                st.metric("Cavity ID", cavity_id)
+            else:
+                st.info("No docking results available")
 
 # ============================================
-# PREDICT IC50 (مختصر بسبب طول الكود)
+# PREDICT IC50
 # ============================================
-elif option == "🔮 Predict IC50":
+elif option == " Predict IC50":
     st.markdown("## 🔮 Predict IC50 from SMILES")
     st.markdown("---")
     
@@ -1132,9 +1363,9 @@ elif option == "🔮 Predict IC50":
                 st.caption("Novel EGFR Inhibitor")
 
 # ============================================
-# GENERATE MOLECULES (مختصر)
+# GENERATE MOLECULES
 # ============================================
-elif option == "🧪 Generate Molecules":
+elif option == " Generate Molecules":
     st.markdown("## 🧪 Generate Molecules from Properties")
     st.markdown("---")
     
@@ -1208,9 +1439,9 @@ elif option == "🧪 Generate Molecules":
                 })
 
 # ============================================
-# DRUG FORMULATION (مختصر)
+# DRUG FORMULATION
 # ============================================
-elif option == "💊 Drug Formulation":
+elif option == " Drug Formulation":
     st.markdown("## 💊 Drug Formulation & Analysis")
     st.markdown("---")
     
@@ -1272,14 +1503,14 @@ elif option == "💊 Drug Formulation":
 # ============================================
 # LUBATINIB
 # ============================================
-elif option == "⭐ Lubatinib":
+elif option == " Lubatinib":
     st.markdown("## ⭐ Lubatinib - Novel EGFR Inhibitor")
     st.markdown("---")
     
     if lubatinib.get('smi'):
         st.markdown("""
         <div style="background: linear-gradient(135deg, #3b82f6, #8b5cf6); border-radius: 20px; padding: 30px; margin-bottom: 30px;">
-            <h1 style="color: white; margin: 0;">🧬 Lubatinib</h1>
+            <h1 style="color: white; margin: 0;">⚛️ Lubatinib</h1>
             <p style="color: rgba(255,255,255,0.9);">A Novel EGFR Tyrosine Kinase Inhibitor Designed via CB-Dock</p>
         </div>
         """, unsafe_allow_html=True)
@@ -1307,10 +1538,96 @@ elif option == "⭐ Lubatinib":
         tab1, tab2, tab3, tab4 = st.tabs(["🎯 Docking", "💊 PK/PD", "⚠️ Toxicity", "🧬 Mutations"])
         
         with tab1:
-            dock_results = parse_cbdock_results(lubatinib.get('txt', ''))
-            if dock_results:
-                for key, val in dock_results.items():
-                    st.metric(key.replace('_', ' ').title(), val)
+            st.subheader("🎯 Docking Results")
+            
+            # Direct extraction from file - gets all cavities and picks best
+            txt_content = lubatinib.get('txt', '')
+            binding_energy = None
+            cavity_volume = None
+            cavity_id = None
+            rmsd = None
+            all_results = []
+            
+            if txt_content:
+                import re
+                lines = txt_content.strip().split('\n')
+                
+                # Collect all cavities
+                for line in lines:
+                    match = re.match(r'^(\d+)\s+(\d+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(-?\d+\.?\d*)', line)
+                    if match:
+                        try:
+                            cid = int(match.group(1))
+                            cvol = float(match.group(2))
+                            cscore = float(match.group(9))
+                            all_results.append({
+                                'id': cid,
+                                'volume': cvol,
+                                'score': cscore
+                            })
+                        except:
+                            pass
+                
+                # Pick best cavity (lowest score = most negative)
+                if all_results:
+                    best = min(all_results, key=lambda x: x['score'])
+                    cavity_id = best['id']
+                    cavity_volume = best['volume']
+                    binding_energy = best['score']
+                    
+                    # Show info about all cavities
+                    if len(all_results) > 1:
+                        st.info(f"📊 Found {len(all_results)} cavities. Best is Cavity {cavity_id} (Score: {binding_energy} kcal/mol)")
+                
+                # Look for RMSD in various formats
+                # Pattern 1: "RMSD: < 2.0 Å" or "RMSD: 1.2"
+                rmsd_match = re.search(r'RMSD:\s*([<\d\.]+\s*\d*\.?\d*)\s*Å', txt_content, re.IGNORECASE)
+                if rmsd_match:
+                    rmsd = rmsd_match.group(1).strip()
+                else:
+                    # Pattern 2: "RMSD: 1.2" without Å
+                    rmsd_match2 = re.search(r'RMSD:\s*([<\d\.]+\s*\d*\.?\d*)', txt_content, re.IGNORECASE)
+                    if rmsd_match2:
+                        rmsd = rmsd_match2.group(1).strip()
+                    else:
+                        # Pattern 3: Look for RMSD in the best cavity line
+                        for line in lines:
+                            if str(cavity_id) in line and 'RMSD' in line:
+                                rmsd_values = re.findall(r'([<\d\.]+\s*\d*\.?\d*)', line)
+                                if rmsd_values:
+                                    rmsd = rmsd_values[0].strip()
+                                    break
+            
+            # Display results
+            if binding_energy is not None:
+                col_a, col_b, col_c, col_d = st.columns(4)
+                with col_a:
+                    st.metric("Binding Energy", f"{binding_energy} kcal/mol")
+                with col_b:
+                    st.metric("Cavity Volume", f"{cavity_volume} Å³")
+                with col_c:
+                    st.metric("Cavity ID", cavity_id)
+                with col_d:
+                    if rmsd is not None:
+                        st.metric("RMSD", f"{rmsd} Å")
+                    else:
+                        st.metric("RMSD", "N/A")
+                
+                if binding_energy < 0:
+                    st.success(f"✅ Good binding affinity: {binding_energy} kcal/mol")
+                
+                # Show all cavities in expander
+                if all_results and len(all_results) > 1:
+                    with st.expander("🔍 View all cavities"):
+                        cavity_df = pd.DataFrame(all_results)
+                        cavity_df = cavity_df.sort_values('score')
+                        cavity_df.columns = ['Cavity ID', 'Volume (Å³)', 'Score (kcal/mol)']
+                        st.dataframe(cavity_df, use_container_width=True)
+            else:
+                st.info("📌 No docking results available. Please check lubatinib.txt file.")
+                if lubatinib.get('txt'):
+                    with st.expander("🔍 View lubatinib.txt content"):
+                        st.code(lubatinib['txt'][:1000], language="text")
         
         with tab2:
             if mol:
@@ -1334,7 +1651,7 @@ elif option == "⭐ Lubatinib":
 # ============================================
 # COMPARATIVE ANALYSIS
 # ============================================
-elif option == "📊 Comparative Analysis":
+elif option == " Comparative Analysis":
     st.markdown("## 📊 Comparative Drug Analysis")
     st.markdown("---")
     
@@ -1366,7 +1683,7 @@ elif option == "📊 Comparative Analysis":
 # ============================================
 # MUTATION ANALYSIS
 # ============================================
-elif option == "🧬 Mutation Analysis":
+elif option == " Mutation Analysis":
     st.markdown("## 🧬 EGFR Mutation Resistance Analysis")
     st.markdown("---")
     
@@ -1382,15 +1699,15 @@ elif option == "🧬 Mutation Analysis":
         st.plotly_chart(fig, use_container_width=True)
 
 # ============================================
-# DOCKING VIEWER - NEW FEATURE
+# DOCKING VIEWER
 # ============================================
-elif option == "🔬 Docking Viewer":
+elif option == " Docking Viewer":
     st.markdown("## 🔬 Molecular Docking Viewer")
     st.markdown("---")
     
     st.markdown("""
     <div style="background: linear-gradient(135deg, #3b82f6, #8b5cf6); border-radius: 20px; padding: 25px; margin-bottom: 25px;">
-        <h2 style="color: white; margin: 0;">🧬 Interactive 3D Docking Viewer</h2>
+        <h2 style="color: white; margin: 0;">⚛️ Interactive 3D Docking Viewer</h2>
         <p style="color: rgba(255,255,255,0.9);">Visualize protein-ligand interactions in 3D</p>
     </div>
     """, unsafe_allow_html=True)
@@ -1468,7 +1785,7 @@ elif option == "🔬 Docking Viewer":
 # ============================================
 # REPORTS
 # ============================================
-elif option == "📄 Reports":
+elif option == " Reports":
     st.markdown("## 📄 Auto-Generated Drug Reports")
     st.markdown("---")
     
@@ -1512,7 +1829,7 @@ elif option == "📄 Reports":
 # ============================================
 # API INTEGRATION
 # ============================================
-elif option == "🌐 API Integration":
+elif option == " API Integration":
     st.markdown("## 🌐 External API Integration")
     st.markdown("---")
     
@@ -1540,7 +1857,7 @@ elif option == "🌐 API Integration":
 # ============================================
 # VIEW MOLECULES
 # ============================================
-elif option == "📊 View Molecules":
+elif option == " View Molecules":
     st.markdown("## 📊 Generated Molecules")
     st.markdown("---")
     
@@ -1572,7 +1889,7 @@ elif option == "📊 View Molecules":
 # ============================================
 # ABOUT
 # ============================================
-elif option == "📈 About":
+elif option == " About":
     st.markdown("## 📈 About SEGULAH AI")
     st.markdown("---")
     
@@ -1580,7 +1897,7 @@ elif option == "📈 About":
     
     with col1:
         st.markdown("""
-        ### 🧬 SEGULAH AI - Next-Generation Drug Discovery
+        ### ⚛️ SEGULAH AI - Next-Generation Drug Discovery
         
         **SEGULAH AI** is an advanced AI platform for drug discovery targeting EGFR.
         
