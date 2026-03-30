@@ -495,7 +495,7 @@ def generate_html_report(compound_name, smiles, properties, docking_results, pk_
         html += "<h2>Molecular Properties</h2>"
         html += "<table border='1' cellpadding='8' style='border-collapse: collapse; width: 100%;'>"
         for key, val in properties.items():
-            html += f"业<nth>{key}</th>\\n<td>{val}</td>\\n</tr>"
+            html += f"<tr><th>{key}</th><td>{val}</td></tr>"
         html += "</table>"
     
     html += f"""
@@ -885,17 +885,18 @@ def load_data():
             except:
                 continue
     
+    # Fallback demo data
+    st.warning("⚠️ Data file not found. Using demo data.")
     return pd.DataFrame({
-        'SMILES': ['CCO', 'CCN', 'CCC'],
-        'MolWt': [46.07, 45.08, 44.09],
-        'LogP': [0.23, 0.15, 0.25],
-        'NumHDonors': [1, 1, 1],
-        'NumHAcceptors': [1, 1, 1],
-        'NumRotatableBonds': [0, 0, 0],
-        'NumAromaticRings': [0, 0, 0],
-        'TPSA': [20.23, 20.23, 20.23],
-        'FractionCSP3': [0.0, 0.0, 0.0],
-        'predicted_ic50_nM': [10.5, 12.3, 8.7]
+        'predicted_ic50_nM': [5.86, 7.34, 8.18, 9.04, 10.2],
+        'MolWt': [432.5, 445.6, 458.7, 471.8, 484.9],
+        'LogP': [2.5, 2.8, 3.1, 3.4, 3.7],
+        'NumHDonors': [2, 2, 3, 3, 4],
+        'NumHAcceptors': [6, 7, 7, 8, 8],
+        'NumRotatableBonds': [5, 6, 6, 7, 7],
+        'NumAromaticRings': [3, 3, 4, 4, 4],
+        'TPSA': [80, 85, 90, 95, 100],
+        'FractionCSP3': [0.4, 0.4, 0.5, 0.5, 0.6]
     })
 
 @st.cache_data
@@ -975,23 +976,13 @@ def load_lubatinib_data():
     
     return data
 
-# Show loading animation with progress
-with st.spinner(""):
-    st.markdown(show_loading_animation(), unsafe_allow_html=True)
-    progress_placeholder = st.empty()
-    progress_bar = progress_placeholder.progress(0, text="Initializing SEGULAH AI...")
-    
-    for i in range(101):
-        time.sleep(0.005)
-        progress_bar.progress(i / 100, text=f"Loading SEGULAH AI... {i}%")
-    
+# Show loading animation with progress (quick version)
+with st.spinner("Initializing SEGULAH AI..."):
     model, scaler = load_model()
     df = load_data()
     df_admet = load_admet_results()
     df_new_molecules = load_new_molecules()
     lubatinib = load_lubatinib_data()
-    
-    progress_placeholder.empty()
 
 # Add ADMET Score
 def calculate_admet_score(row):
@@ -1409,11 +1400,16 @@ elif option == " Generate Molecules":
             submitted = st.form_submit_button("🎯 Predict IC50", type="primary", use_container_width=True)
             
             if submitted:
-                show_operation_progress("Running AI prediction", 1.5)
+                # Run prediction immediately without artificial delay
                 features = [[molwt, logp, h_donors, h_acceptors, rot_bonds, aromatic_rings, tpsa, fraction_csp3]]
                 features_scaled = scaler.transform(features)
-                pred_log = model.predict(features_scaled, verbose=0)[0][0]
-                pred_ic50 = 10 ** pred_log
+                
+                if model is None:
+                    pred_ic50 = 12.5  # demo value
+                    st.info("📊 Demo mode: Model not loaded.")
+                else:
+                    pred_log = model.predict(features_scaled, verbose=0)[0][0]
+                    pred_ic50 = 10 ** pred_log
                 
                 st.success(f"### 🎯 Predicted IC50: **{pred_ic50:.3f} nM**")
                 add_notification(f"Generated molecule with IC50: {pred_ic50:.3f} nM", "success", push=True)
